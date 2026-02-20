@@ -1,0 +1,20 @@
+# Python env
+.venv/
+venv/
+env/
+
+# python cache
+__pycache__/
+*.pyc
+
+# model / vector db / cache
+models/
+chroma/
+*.bin
+*.safetensors
+
+# secrets
+.env
+
+# macOS
+.DS_Store
