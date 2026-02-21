@@ -1,0 +1,5 @@
+{"query":"我们第一次见面在哪里？","gt_plot_id":"p01","stage":0,"affection":20,"memory_unlock":0}
+{"query":"你上次为什么生气？","gt_plot_id":"p12","stage":1,"affection":35,"memory_unlock":0}
+{"query":"我们约会去过哪里？","gt_plot_id":"p21","stage":2,"affection":60,"memory_unlock":1}
+{"query":"你觉得我哪方面最吸引人？","gt_plot_id":"p31","stage":3,"affection":80,"memory_unlock":2}
+{"query":"我们在一起多久了？","gt_plot_id":"p41","stage":4,"affection":90,"memory_unlock":3}
