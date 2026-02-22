@@ -2,9 +2,7 @@ gradio==4.44.1
 chromadb==0.5.5
 sentence-transformers==3.0.1
 python-dotenv==1.0.1
-
-transformers==4.43.3
+transformers==4.51.3
 accelerate==0.33.0
-torch>=2.1
+torch>=2.4
 peft==0.12.0
-

@@ -1,9 +1,9 @@
 # src/core/local_llm.py
 import os
-from your_llm_loader import load_llm, chat  # 按你实际 import 路径改
+from core.llm import load_llm, chat
 
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
-LORA_PATH = os.getenv("LORA_PATH")  # 乙女 LoRA
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3-8B")
+LORA_PATH = os.getenv("LORA_PATH")  # 乙女 LoRA，没有就留空
 
 _tokenizer = None
 _model = None
@@ -15,5 +15,9 @@ def _ensure_loaded():
     return _tokenizer, _model
 
 def chat_local_otome(messages, temperature=0.7, max_tokens=256):
-    tokenizer, model = _ensure_loaded()
-    return chat(tokenizer, model, messages, temperature=temperature)
+    try:
+        tokenizer, model = _ensure_loaded()
+        return chat(tokenizer, model, messages, temperature=temperature)
+    except Exception as e:
+        print(f"[local_llm] 本地模型加载失败，fallback 到 API: {e}")
+        return None  # 返回 None 让 router fallback 到 Qwen API
