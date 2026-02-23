@@ -1,19 +1,23 @@
 import os
+import json
+import datetime
 import gradio as gr
-
 from core.llm import load_llm, chat
 from core.state import load_state, save_state, update_trust_stage
 from core.adapters import retrieve_for_otome, build_messages, unlock_memories
 from core.llm_router import routed_chat
 
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3-8B")
-LORA_PATH = os.getenv("LORA_PATH")  # 可选：./lora_otome
-
+LORA_PATH = os.getenv("LORA_PATH")
 tokenizer, model = load_llm(MODEL_NAME, lora_path=LORA_PATH)
 persona = open("./data/canon/persona.md", "r", encoding="utf-8").read()
 
+FEEDBACK_FILE = "./data/feedback_log.jsonl"
+
+
 def stage_label(stage: int) -> str:
     return ["初见", "熟悉", "心动", "默契恋人"][max(0, min(int(stage), 3))]
+
 
 def respond(user_msg, history, affection_box, stage_box, memories_box):
     user_id = "u1"
@@ -22,13 +26,11 @@ def respond(user_msg, history, affection_box, stage_box, memories_box):
     if not user_msg:
         return history, "", affection_box, stage_box, memories_box
 
-    # 1) load state
     state = load_state(user_id)
     affection = getattr(state, "trust", 20)
     stage = getattr(state, "stage", 0)
     memory_unlock = getattr(state, "memory_unlock", getattr(state, "spoiler_level", 0))
 
-    # 2) retrieve
     canon_pairs = retrieve_for_otome(
         query=user_msg,
         stage=stage,
@@ -37,7 +39,6 @@ def respond(user_msg, history, affection_box, stage_box, memories_box):
         k=6
     )
 
-    # 3) prompt/messages
     messages = build_messages(
         persona=persona,
         state={
@@ -51,7 +52,6 @@ def respond(user_msg, history, affection_box, stage_box, memories_box):
         user_msg=user_msg,
     )
 
-    # 4) router
     def local_chat_fn(msgs, temp):
         return chat(tokenizer, model, msgs, temperature=temp)
 
@@ -64,10 +64,8 @@ def respond(user_msg, history, affection_box, stage_box, memories_box):
         max_tokens=256
     )
 
-    # 5) update state after reply
     state = update_trust_stage(state, user_msg)
 
-    # 6) unlock (optional)
     if unlock_memories is not None:
         try:
             state, newly = unlock_memories(state, canon_pairs)
@@ -86,19 +84,62 @@ def respond(user_msg, history, affection_box, stage_box, memories_box):
 
     return history, "", affection_box, stage_box, memories_box
 
+
+def save_feedback(rating, feedback_text, history):
+    if not history:
+        return "请先发送消息再评价"
+    last_user, last_reply = history[-1]
+    record = {
+        "time": datetime.datetime.now().isoformat(),
+        "user": last_user,
+        "reply": last_reply,
+        "rating": rating,       # "好" / "一般" / "差"
+        "feedback": feedback_text.strip() if feedback_text else "",
+    }
+    os.makedirs(os.path.dirname(FEEDBACK_FILE), exist_ok=True)
+    with open(FEEDBACK_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return f"✅ 已记录（{rating}）"
+
+
 with gr.Blocks() as demo:
     gr.Markdown("# 乙游对话 Demo（Router: 本地LoRA / 云端Qwen）")
 
     with gr.Row():
         with gr.Column(scale=3):
-            chatbot = gr.Chatbot(height=560)
-            msg = gr.Textbox(label="输入", placeholder="比如：我今天有点累… / 帮我写个计划 / 解释一下xxx")
+            chatbot = gr.Chatbot(height=520)
+            msg = gr.Textbox(
+                label="输入",
+                placeholder="比如：我今天有点累… / 帮我写个计划 / 解释一下xxx"
+            )
+
+            # 评价区域
+            with gr.Group():
+                gr.Markdown("#### 评价这条回复")
+                with gr.Row():
+                    btn_good = gr.Button("👍 好")
+                    btn_ok = gr.Button("😐 一般")
+                    btn_bad = gr.Button("👎 差")
+                feedback_text = gr.Textbox(
+                    label="补充说明（可选）",
+                    placeholder="比如：太模板了 / 很自然 / 再暧昧一点…",
+                    lines=2
+                )
+                feedback_status = gr.Textbox(label="", interactive=False)
+
         with gr.Column(scale=1):
             affection_box = gr.Textbox(label="亲密度", value="20/100", interactive=False)
             stage_box = gr.Textbox(label="关系阶段", value="初见", interactive=False)
             memories_box = gr.Textbox(label="已解锁回忆", value="（暂无）", lines=12, interactive=False)
 
-    msg.submit(respond, [msg, chatbot, affection_box, stage_box, memories_box],
-               [chatbot, msg, affection_box, stage_box, memories_box])
+    msg.submit(
+        respond,
+        [msg, chatbot, affection_box, stage_box, memories_box],
+        [chatbot, msg, affection_box, stage_box, memories_box]
+    )
+
+    btn_good.click(save_feedback, ["好", feedback_text, chatbot], feedback_status)
+    btn_ok.click(save_feedback, ["一般", feedback_text, chatbot], feedback_status)
+    btn_bad.click(save_feedback, ["差", feedback_text, chatbot], feedback_status)
 
 demo.launch(server_name="0.0.0.0", server_port=7860, share=True)
