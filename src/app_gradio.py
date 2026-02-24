@@ -137,9 +137,21 @@ with gr.Blocks() as demo:
         [msg, chatbot, affection_box, stage_box, memories_box],
         [chatbot, msg, affection_box, stage_box, memories_box]
     )
-
-    btn_good.click(save_feedback, ["好", feedback_text, chatbot], feedback_status)
-    btn_ok.click(save_feedback, ["一般", feedback_text, chatbot], feedback_status)
-    btn_bad.click(save_feedback, ["差", feedback_text, chatbot], feedback_status)
+    btn_good.click(
+        lambda fb, chat: save_feedback("好", fb, chat), 
+        [feedback_text, chatbot], 
+        feedback_status
+    )
+    btn_ok.click(
+        lambda fb, chat: save_feedback("一般", fb, chat), 
+        [feedback_text, chatbot], 
+        feedback_status
+    )
+    btn_bad.click(
+        lambda fb, chat: save_feedback("差", fb, chat), 
+        [feedback_text, chatbot], 
+        feedback_status
+    )
+    
 
 demo.launch(server_name="0.0.0.0", server_port=7860, share=True)
